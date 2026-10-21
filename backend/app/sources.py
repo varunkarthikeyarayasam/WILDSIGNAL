@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import csv
@@ -5,15 +6,31 @@ import hashlib
 import io
 import json
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 from typing import Any
 
 from .analysis import parse_acquisition, parse_number
-from .config import FIRMS_CACHE_SECONDS, FIRMS_LOOKBACK_DAYS, FIRMS_MAP_KEY, FIRMS_SOURCE, OSM_CACHE_SECONDS, OVERPASS_TIMEOUT_SECONDS, OVERPASS_URL, REGION_BBOX
-from .database import cached_facilities, set_source_state, source_states, upsert_facilities, upsert_observations, utc_now
+from .config import (
+    FIRMS_CACHE_SECONDS,
+    FIRMS_LOOKBACK_DAYS,
+    FIRMS_MAP_KEY,
+    FIRMS_SOURCE,
+    OSM_CACHE_SECONDS,
+    OVERPASS_TIMEOUT_SECONDS,
+    OVERPASS_URL,
+    REGION_BBOX,
+)
+from .database import (
+    cached_facilities,
+    set_source_state,
+    source_states,
+    upsert_facilities,
+    upsert_observations,
+    utc_now,
+)
 
 
 class SourceError(RuntimeError):
@@ -22,19 +39,25 @@ class SourceError(RuntimeError):
         self.source, self.status = source, status
 
 
-def _request(url: str, body: bytes | None = None, content_type: str | None = None, timeout: int = 35) -> bytes:
-    headers = {"User-Agent": "WILDSIGNAL/0.1 (research prototype; contact: project maintainers)"}
+def _request(
+    url: str,
+    body: bytes | None = None,
+    content_type: str | None = None,
+    timeout: int = 35,
+) -> bytes:
+    headers = {
+        "User-Agent": "WILDSIGNAL/0.1 (research prototype; contact: project maintainers)"
+    }
     if content_type:
         headers["Content-Type"] = content_type
 
-    request = Request(
-        url,
-        data=body,
-        headers=headers,
-        method="POST" if body is not None else "GET",
-    )
-
     for attempt in range(3):
+        request = Request(
+            url,
+            data=body,
+            headers=headers,
+            method="POST" if body is not None else "GET",
+        )
         try:
             with urlopen(request, timeout=timeout) as response:
                 return response.read()
@@ -64,7 +87,7 @@ def _request(url: str, body: bytes | None = None, content_type: str | None = Non
         except (URLError, TimeoutError, OSError) as exc:
             if attempt == 2:
                 print(
-                    f"WILDSIGNAL upstream network error: "
+                    "WILDSIGNAL upstream network error: "
                     f"url={url!r}, error={type(exc).__name__}: {exc}",
                     flush=True,
                 )
@@ -74,7 +97,13 @@ def _request(url: str, body: bytes | None = None, content_type: str | None = Non
                     503,
                 ) from None
 
-        time.sleep(0.25 * (2 ** attempt))
+        time.sleep(0.25 * (2**attempt))
+
+    raise SourceError(
+        "upstream_timeout_or_network",
+        "The upstream provider could not be reached.",
+        503,
+    )
 
 
 def _record_id(*values: str) -> str:
@@ -83,93 +112,232 @@ def _record_id(*values: str) -> str:
 
 def fetch_firms(start: date, end: date) -> list[dict[str, Any]]:
     if not FIRMS_MAP_KEY:
-        raise SourceError("credential_required", "Configure FIRMS_MAP_KEY in backend/.env to retrieve NASA FIRMS records.", 424)
+        raise SourceError(
+            "credential_required",
+            "Configure FIRMS_MAP_KEY in the backend environment to retrieve NASA FIRMS records.",
+            424,
+        )
+
     span = (end - start).days + 1
     if span < 1 or span > 30:
-        raise SourceError("invalid_window", "FIRMS requests are limited to a 1–30 day window.", 422)
+        raise SourceError(
+            "invalid_window",
+            "FIRMS requests are limited to a 1–30 day window.",
+            422,
+        )
+
     retrieved_at = utc_now()
     records: list[dict[str, Any]] = []
     cursor = start
+
     while cursor <= end:
         chunk_days = min(5, (end - cursor).days + 1)
         bbox = ",".join(str(value) for value in REGION_BBOX)
-        key, source, area = quote(FIRMS_MAP_KEY, safe=""), quote(FIRMS_SOURCE, safe=""), quote(bbox, safe=",")
-        url = f"https://firms.modaps.eosdis.nasa.gov/api/area/csv/{key}/{source}/{area}/{chunk_days}/{cursor.isoformat()}"
+        key = quote(FIRMS_MAP_KEY, safe="")
+        source = quote(FIRMS_SOURCE, safe="")
+        area = quote(bbox, safe=",")
+        url = (
+            f"https://firms.modaps.eosdis.nasa.gov/api/area/csv/"
+            f"{key}/{source}/{area}/{chunk_days}/{cursor.isoformat()}"
+        )
+
         try:
             text = _request(url).decode("utf-8-sig")
-            if any(marker in text.lower() for marker in ("invalid map key", "invalid map_key", "unauthorized", "access denied")):
-                raise SourceError("invalid_credentials", "NASA FIRMS rejected the configured map key.", 424)
+
+            if any(
+                marker in text.lower()
+                for marker in (
+                    "invalid map key",
+                    "invalid map_key",
+                    "unauthorized",
+                    "access denied",
+                )
+            ):
+                raise SourceError(
+                    "invalid_credentials",
+                    "NASA FIRMS rejected the configured map key.",
+                    424,
+                )
+
             reader = csv.DictReader(io.StringIO(text))
-            if not reader.fieldnames or not {"latitude", "longitude"}.issubset({field.strip().lower() for field in reader.fieldnames}):
-                raise SourceError("invalid_provider_response", "NASA FIRMS returned an unexpected response.", 502)
-            rows = list(reader)
-            for row in rows:
-                lat, lon = parse_number(row.get("latitude")), parse_number(row.get("longitude"))
-                if lat is None or lon is None or not -90 <= lat <= 90 or not -180 <= lon <= 180:
+            if not reader.fieldnames or not {
+                field.strip().lower() for field in reader.fieldnames
+            }.issuperset({"latitude", "longitude"}):
+                raise SourceError(
+                    "invalid_provider_response",
+                    "NASA FIRMS returned an unexpected response.",
+                    502,
+                )
+
+            for row in reader:
+                lat = parse_number(row.get("latitude"))
+                lon = parse_number(row.get("longitude"))
+
+                if (
+                    lat is None
+                    or lon is None
+                    or not -90 <= lat <= 90
+                    or not -180 <= lon <= 180
+                ):
                     continue
+
                 try:
-                    acquired_at = parse_acquisition(row.get("acq_date", ""), row.get("acq_time", ""))
+                    acquired_at = parse_acquisition(
+                        row.get("acq_date", ""),
+                        row.get("acq_time", ""),
+                    )
                 except ValueError:
                     continue
-                satellite, instrument = row.get("satellite"), row.get("instrument")
+
+                satellite = row.get("satellite")
+                instrument = row.get("instrument")
                 provider_id = row.get("id") or row.get("record_id")
-                record_id = _record_id(FIRMS_SOURCE, provider_id) if provider_id else _record_id(FIRMS_SOURCE, satellite or "", instrument or "", acquired_at, f"{lat:.7f}", f"{lon:.7f}", row.get("version", ""))
-                records.append({"id": record_id, "latitude": lat, "longitude": lon, "acquired_at": acquired_at,
-                    "satellite": satellite, "instrument": instrument, "source": FIRMS_SOURCE,
-                    "confidence": row.get("confidence") or None, "bright_ti4": parse_number(row.get("bright_ti4")),
-                    "bright_ti5": parse_number(row.get("bright_ti5")), "frp": parse_number(row.get("frp")),
-                    "daynight": row.get("daynight") or None, "satellite_record_id": provider_id,
-                    "provider_metadata": row, "retrieved_at": retrieved_at})
+
+                if provider_id:
+                    record_id = _record_id(FIRMS_SOURCE, provider_id)
+                else:
+                    record_id = _record_id(
+                        FIRMS_SOURCE,
+                        satellite or "",
+                        instrument or "",
+                        acquired_at,
+                        f"{lat:.7f}",
+                        f"{lon:.7f}",
+                        row.get("version", ""),
+                    )
+
+                records.append(
+                    {
+                        "id": record_id,
+                        "latitude": lat,
+                        "longitude": lon,
+                        "acquired_at": acquired_at,
+                        "satellite": satellite,
+                        "instrument": instrument,
+                        "source": FIRMS_SOURCE,
+                        "confidence": row.get("confidence") or None,
+                        "bright_ti4": parse_number(row.get("bright_ti4")),
+                        "bright_ti5": parse_number(row.get("bright_ti5")),
+                        "frp": parse_number(row.get("frp")),
+                        "daynight": row.get("daynight") or None,
+                        "satellite_record_id": provider_id,
+                        "provider_metadata": row,
+                        "retrieved_at": retrieved_at,
+                    }
+                )
+
         except SourceError:
             raise
         except (UnicodeError, csv.Error):
-            raise SourceError("invalid_provider_response", "NASA FIRMS returned malformed CSV.", 502) from None
+            raise SourceError(
+                "invalid_provider_response",
+                "NASA FIRMS returned malformed CSV.",
+                502,
+            ) from None
+
         cursor += timedelta(days=chunk_days)
+
     upsert_observations(records)
-    set_source_state("firms", "available", None, retrieved_at, len(records), time.time() + FIRMS_CACHE_SECONDS)
+    set_source_state(
+        "firms",
+        "available",
+        None,
+        retrieved_at,
+        len(records),
+        time.time() + FIRMS_CACHE_SECONDS,
+    )
     return records
 
 
-def _facility_geometry(element: dict[str, Any]) -> tuple[dict[str, Any], float, float] | None:
+def _facility_geometry(
+    element: dict[str, Any],
+) -> tuple[dict[str, Any], float, float] | None:
     if element.get("type") == "node":
-        lat, lon = parse_number(element.get("lat")), parse_number(element.get("lon"))
-        if lat is None or lon is None or not -90 <= lat <= 90 or not -180 <= lon <= 180:
+        lat = parse_number(element.get("lat"))
+        lon = parse_number(element.get("lon"))
+
+        if (
+            lat is None
+            or lon is None
+            or not -90 <= lat <= 90
+            or not -180 <= lon <= 180
+        ):
             return None
+
         return {"type": "Point", "coordinates": [lon, lat]}, lat, lon
+
     points = element.get("geometry") or []
     if not isinstance(points, list):
         return None
+
     coordinates = []
     for point in points:
         if not isinstance(point, dict):
             continue
-        lon, lat = parse_number(point.get("lon")), parse_number(point.get("lat"))
-        if lon is not None and lat is not None and -180 <= lon <= 180 and -90 <= lat <= 90:
+
+        lon = parse_number(point.get("lon"))
+        lat = parse_number(point.get("lat"))
+
+        if (
+            lon is not None
+            and lat is not None
+            and -180 <= lon <= 180
+            and -90 <= lat <= 90
+        ):
             coordinates.append([lon, lat])
+
     if len(coordinates) >= 2:
         closed = coordinates[0] == coordinates[-1]
+
         if closed and len(coordinates) >= 4:
             geometry = {"type": "Polygon", "coordinates": [coordinates]}
         else:
             geometry = {"type": "LineString", "coordinates": coordinates}
-        center = element.get("center") or {"lat": sum(p[1] for p in coordinates) / len(coordinates), "lon": sum(p[0] for p in coordinates) / len(coordinates)}
-        lat, lon = parse_number(center.get("lat")), parse_number(center.get("lon"))
-        if lat is None or lon is None or not -90 <= lat <= 90 or not -180 <= lon <= 180:
+
+        center = element.get("center") or {
+            "lat": sum(point[1] for point in coordinates) / len(coordinates),
+            "lon": sum(point[0] for point in coordinates) / len(coordinates),
+        }
+        lat = parse_number(center.get("lat"))
+        lon = parse_number(center.get("lon"))
+
+        if (
+            lat is None
+            or lon is None
+            or not -90 <= lat <= 90
+            or not -180 <= lon <= 180
+        ):
             return None
+
         return geometry, lat, lon
+
     center = element.get("center")
     if center:
-        lat, lon = parse_number(center.get("lat")), parse_number(center.get("lon"))
-        if lat is None or lon is None or not -90 <= lat <= 90 or not -180 <= lon <= 180:
-            return None
-        return {"type": "Point", "coordinates": [lon, lat]}, lat, lon
-    return None
+        lat = parse_number(center.get("lat"))
+        lon = parse_number(center.get("lon"))
 
+        if (
+            lat is None
+            or lon is None
+            or not -90 <= lat <= 90
+            or not -180 <= lon <= 180
+        ):
+            return None
+
+        return {"type": "Point", "coordinates": [lon, lat]}, lat, lon
+
+    return None
 
 
 def fetch_osm(force: bool = False) -> list[dict[str, Any]]:
     state = source_states().get("osm")
-    if not force and state and state.get("cache_until") and state["cache_until"] > time.time():
+
+    if (
+        not force
+        and state
+        and state.get("cache_until")
+        and state["cache_until"] > time.time()
+    ):
         return cached_facilities()
 
     west, south, east, north = REGION_BBOX
@@ -198,19 +366,28 @@ def fetch_osm(force: bool = False) -> list[dict[str, Any]]:
         out center tags;"""
 
         try:
-            payload = json.loads(
-                _request(
-                    OVERPASS_URL,
-                    urlencode({"data": query}).encode(),
-                    "application/x-www-form-urlencoded",
-                    min(OVERPASS_TIMEOUT_SECONDS, 25),
-                )
+            raw = _request(
+                OVERPASS_URL,
+                urlencode({"data": query}).encode(),
+                "application/x-www-form-urlencoded",
+                max(5, min(OVERPASS_TIMEOUT_SECONDS, 25)),
             )
-        except json.JSONDecodeError:
+            payload = json.loads(raw)
+
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             failures += 1
+            print(
+                f"WILDSIGNAL OSM tile returned invalid JSON: {type(exc).__name__}",
+                flush=True,
+            )
             continue
-        except SourceError:
+
+        except SourceError as exc:
             failures += 1
+            print(
+                f"WILDSIGNAL OSM tile failed: {exc.source}: {exc}",
+                flush=True,
+            )
             continue
 
         if (
@@ -219,29 +396,36 @@ def fetch_osm(force: bool = False) -> list[dict[str, Any]]:
             or payload.get("remark")
         ):
             failures += 1
+            print(
+                "WILDSIGNAL OSM tile returned an incomplete or invalid response.",
+                flush=True,
+            )
             continue
 
         for element in payload["elements"]:
             if not isinstance(element, dict):
                 continue
+
             osm_type = element.get("type")
             osm_id = element.get("id")
-            if osm_type in {"node", "way", "relation"} and isinstance(osm_id, int):
+
+            if (
+                osm_type in {"node", "way", "relation"}
+                and isinstance(osm_id, int)
+                and not isinstance(osm_id, bool)
+                and osm_id > 0
+            ):
                 collected[(osm_type, osm_id)] = element
 
-        if len(collected) == 0:
-            time.sleep(1)
-
-    if not collected and failures:
+    if failures == len(tiles):
         raise SourceError(
             "upstream_timeout_or_network",
-            "OpenStreetMap requests timed out or returned no usable data. Retry later.",
+            "All OpenStreetMap tile requests failed. Previously stored facilities were preserved.",
             503,
         )
 
     retrieved = utc_now()
     features: list[dict[str, Any]] = []
-    seen: set[str] = set()
 
     for element in collected.values():
         normalized = _facility_geometry(element)
@@ -250,34 +434,44 @@ def fetch_osm(force: bool = False) -> list[dict[str, Any]]:
 
         geometry, lat, lon = normalized
         tags = element.get("tags") or {}
+
+        if not isinstance(tags, dict):
+            tags = {}
+
         osm_type = str(element.get("type", "unknown"))
         osm_id = int(element.get("id", 0))
         identity = f"{osm_type}/{osm_id}"
 
-        if osm_type not in {"node", "way", "relation"} or osm_id <= 0 or identity in seen:
-            continue
+        features.append(
+            {
+                "id": identity,
+                "osm_type": osm_type,
+                "osm_id": osm_id,
+                "name": tags.get("name"),
+                "tags": tags,
+                "geometry": geometry,
+                "latitude": lat,
+                "longitude": lon,
+                "retrieved_at": retrieved,
+            }
+        )
 
-        seen.add(identity)
-        features.append({
-            "id": identity,
-            "osm_type": osm_type,
-            "osm_id": osm_id,
-            "name": tags.get("name"),
-            "tags": tags,
-            "geometry": geometry,
-            "latitude": lat,
-            "longitude": lon,
-            "retrieved_at": retrieved,
-        })
+    # Upsert only real features received from OSM. Existing records are not
+    # deleted when a refresh fails or returns only part of the requested area.
+    if features:
+        upsert_facilities(features)
 
-    if failures == len(tiles):
+    if failures:
         raise SourceError(
-            "upstream_timeout_or_network",
-            "All OpenStreetMap tile requests failed. Retry later.",
+            "partial_upstream_failure",
+            (
+                f"OpenStreetMap returned partial data: "
+                f"{failures} of {len(tiles)} tiles failed. "
+                "Received facilities were saved; existing records were preserved."
+            ),
             503,
         )
 
-    upsert_facilities(features)
     set_source_state(
         "osm",
         "available",
