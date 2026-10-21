@@ -26,19 +26,42 @@ def _request(url: str, body: bytes | None = None, content_type: str | None = Non
     headers = {"User-Agent": "WILDSIGNAL/0.1 (research prototype; contact: project maintainers)"}
     if content_type:
         headers["Content-Type"] = content_type
-    request = Request(url, data=body, headers=headers, method="POST" if body is not None else "GET")
+
+    request = Request(
+        url,
+        data=body,
+        headers=headers,
+        method="POST" if body is not None else "GET",
+    )
+
     for attempt in range(3):
         try:
             with urlopen(request, timeout=timeout) as response:
                 return response.read()
+
         except HTTPError as exc:
             if exc.code == 429:
-                raise SourceError("upstream_rate_limited", "The data provider rate limited this request.", 503) from None
+                raise SourceError(
+                    "upstream_rate_limited",
+                    "The data provider rate limited this request.",
+                    503,
+                ) from None
+
             if exc.code in {401, 403}:
-                raise SourceError("invalid_credentials", "The provider rejected the configured credentials.", 424) from None
+                raise SourceError(
+                    "invalid_credentials",
+                    "The provider rejected the configured credentials.",
+                    424,
+                ) from None
+
             if exc.code not in {502, 503, 504} or attempt == 2:
-                raise SourceError("upstream_http_error", f"Upstream provider returned HTTP {exc.code}.", 502) from None
-                except (URLError, TimeoutError, OSError) as exc:
+                raise SourceError(
+                    "upstream_http_error",
+                    f"Upstream provider returned HTTP {exc.code}.",
+                    502,
+                ) from None
+
+        except (URLError, TimeoutError, OSError) as exc:
             if attempt == 2:
                 print(
                     f"WILDSIGNAL upstream network error: "
@@ -50,6 +73,7 @@ def _request(url: str, body: bytes | None = None, content_type: str | None = Non
                     "The upstream provider timed out or could not be reached.",
                     503,
                 ) from None
+
         time.sleep(0.25 * (2 ** attempt))
 
 
