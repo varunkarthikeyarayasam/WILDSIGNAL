@@ -38,9 +38,18 @@ def _request(url: str, body: bytes | None = None, content_type: str | None = Non
                 raise SourceError("invalid_credentials", "The provider rejected the configured credentials.", 424) from None
             if exc.code not in {502, 503, 504} or attempt == 2:
                 raise SourceError("upstream_http_error", f"Upstream provider returned HTTP {exc.code}.", 502) from None
-        except (URLError, TimeoutError, OSError):
+                except (URLError, TimeoutError, OSError) as exc:
             if attempt == 2:
-                raise SourceError("upstream_timeout_or_network", "The upstream provider timed out or could not be reached.", 503) from None
+                print(
+                    f"WILDSIGNAL upstream network error: "
+                    f"url={url!r}, error={type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+                raise SourceError(
+                    "upstream_timeout_or_network",
+                    "The upstream provider timed out or could not be reached.",
+                    503,
+                ) from None
         time.sleep(0.25 * (2 ** attempt))
 
 
