@@ -11,6 +11,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 from typing import Any
+from pathlib import Path
 
 from .analysis import parse_acquisition, parse_number
 from .config import (
