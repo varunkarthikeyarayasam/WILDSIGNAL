@@ -8,6 +8,7 @@
 
   position: relative;
   isolation: isolate;
+  scroll-margin-top: 0;
   display: flex;
   min-height: 100svh;
   flex-direction: column;
@@ -18,6 +19,16 @@
     radial-gradient(ellipse at 15% 80%, #30212f 0%, transparent 40%),
     var(--plum);
   font-family: inherit;
+  transition: opacity 480ms var(--ease, cubic-bezier(.16, 1, .3, 1)),
+              transform 480ms var(--ease, cubic-bezier(.16, 1, .3, 1)),
+              filter 480ms var(--ease, cubic-bezier(.16, 1, .3, 1));
+}
+
+.living-hero.is-exiting {
+  opacity: 0;
+  transform: scale(1.03);
+  filter: blur(8px);
+  pointer-events: none;
 }
 
 .living-hero *,
@@ -26,6 +37,7 @@
   box-sizing: border-box;
 }
 
+/* Grain and vignette */
 .living-hero__grain,
 .living-hero__vignette {
   position: absolute;
@@ -45,6 +57,7 @@
   background: radial-gradient(ellipse at center, transparent 30%, #160e19b8 100%);
 }
 
+/* Topbar */
 .living-hero__topbar {
   position: relative;
   z-index: 6;
@@ -107,6 +120,7 @@
   box-shadow: 0 0 12px #b7c65b70;
 }
 
+/* Planetary world */
 .living-hero__world {
   position: absolute;
   z-index: 1;
@@ -218,6 +232,7 @@
     0 0 55px #e76b4a17;
 }
 
+/* Orbital filaments */
 .living-hero__filaments {
   position: absolute;
   z-index: 4;
@@ -260,6 +275,7 @@
   animation-direction: reverse;
 }
 
+/* Orbital rings */
 .living-hero__orbit {
   position: absolute;
   border: 1px solid #d8b6d52a;
@@ -283,6 +299,7 @@
   transform: rotate(65deg) scaleY(0.38);
 }
 
+/* Thermal signal glints — decorative, not live data */
 .living-hero__signal {
   position: absolute;
   z-index: 5;
@@ -300,6 +317,7 @@
 .living-hero__signal--three { top: 71%; left: 42%; animation-delay: -2.2s; }
 .living-hero__signal--four { top: 24%; left: 60%; width: 4px; height: 4px; animation-delay: -0.6s; }
 
+/* Particle drift */
 .living-hero__particle {
   position: absolute;
   width: 3px;
@@ -316,6 +334,7 @@
 .living-hero__particle--four { bottom: 15%; right: 22%; animation-delay: -2s; background: var(--coral); }
 .living-hero__particle--five { top: 50%; left: 5%; animation-delay: -6s; }
 
+/* Coordinate labels */
 .living-hero__coordinate {
   position: absolute;
   z-index: 5;
@@ -343,6 +362,7 @@
   text-align: right;
 }
 
+/* Content */
 .living-hero__content {
   position: relative;
   z-index: 5;
@@ -406,6 +426,8 @@
   font: inherit;
   font-size: 12px;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
   transition: background 220ms ease, border-color 220ms ease, transform 220ms ease;
 }
 
@@ -464,6 +486,8 @@
   font-size: 8px;
   letter-spacing: 0.15em;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .living-hero__scroll svg {
@@ -482,6 +506,7 @@
   letter-spacing: 0.14em;
 }
 
+/* Keyframes */
 @keyframes living-enter {
   from { opacity: 0; transform: translateY(18px); }
   to { opacity: 1; transform: translateY(0); }
@@ -515,6 +540,7 @@
   50% { transform: translateY(4px); }
 }
 
+/* Responsive */
 @media (min-width: 1500px) {
   .living-hero__world {
     right: -1%;
@@ -605,16 +631,6 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .living-hero.motion-reduced *,
-  .living-hero.motion-reduced *::before,
-  .living-hero.motion-reduced *::after {
-    animation: none !important;
-    scroll-behavior: auto !important;
-    transition: none !important;
-  }
-}
-
 @media (max-height: 650px) and (min-width: 801px) {
   .living-hero__world {
     width: 68vh;
@@ -634,25 +650,26 @@
     margin: 16px 0 20px;
   }
 }
-/* Cinematic handoff into the live investigation workspace */
-.living-hero {
-  isolation: isolate;
-  scroll-margin-top: 0;
-}
 
-.living-hero__explore,
-.living-hero__scroll {
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-}
-
-.living-hero__explore:focus-visible,
-.living-hero__scroll:focus-visible {
-  outline: 2px solid #B7C65B;
-  outline-offset: 5px;
-}
-
+/* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
+  .living-hero {
+    transition: none;
+  }
+
+  .living-hero.is-exiting {
+    transform: none;
+    filter: none;
+  }
+
+  .living-hero.motion-reduced *,
+  .living-hero.motion-reduced *::before,
+  .living-hero.motion-reduced *::after {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+
   .living-hero__explore,
   .living-hero__scroll {
     scroll-behavior: auto;

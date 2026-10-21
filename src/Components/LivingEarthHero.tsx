@@ -5,9 +5,10 @@ import './LivingEarthHero.css'
 
 type LivingEarthHeroProps = {
   onExplore: () => void
+  exiting?: boolean
 }
 
-export function LivingEarthHero({ onExplore }: LivingEarthHeroProps) {
+export function LivingEarthHero({ onExplore, exiting }: LivingEarthHeroProps) {
   const [reducedMotion, setReducedMotion] = useState(false)
 
   useEffect(() => {
@@ -20,7 +21,7 @@ export function LivingEarthHero({ onExplore }: LivingEarthHeroProps) {
 
   return (
     <section
-      className={`living-hero ${reducedMotion ? 'motion-reduced' : ''}`}
+      className={`living-hero ${reducedMotion ? 'motion-reduced' : ''} ${exiting ? 'is-exiting' : ''}`}
       aria-labelledby="living-hero-title"
     >
       <div className="living-hero__grain" aria-hidden="true" />
@@ -100,7 +101,7 @@ export function LivingEarthHero({ onExplore }: LivingEarthHeroProps) {
           onClick={onExplore}
           type="button"
         >
-          <span>Enter the investigation</span>
+          <span>Explore dashboard</span>
           <ArrowUpRight size={18} strokeWidth={1.7} />
         </button>
 

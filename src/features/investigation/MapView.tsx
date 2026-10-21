@@ -161,7 +161,6 @@ export function MapView({ layer, observations, facilities, selectedId, showObser
     const instance = new LibreMap({ container: container.current, style: styles.streets,
       center: [80.22, 13.2], zoom: 9, minZoom: 6, maxZoom: 18,
       attributionControl: false, cooperativeGestures: true })
-      console.log('WILDSIGNAL map created')
     map.current = instance
     instance.addControl(new ScaleControl({ maxWidth: 110, unit: 'metric' }), 'bottom-left')
     const addDataLayers = () => {
@@ -171,16 +170,16 @@ export function MapView({ layer, observations, facilities, selectedId, showObser
   }
       if (!instance.getSource('wildsignal-observations')) {
         instance.addSource('wildsignal-observations', { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, cluster: true, clusterRadius: 42, clusterMaxZoom: 14 })
-        instance.addLayer({ id: 'observation-clusters', type: 'circle', source: 'wildsignal-observations', filter: ['has', 'point_count'], paint: { 'circle-color': '#e95a2a', 'circle-radius': ['step', ['get', 'point_count'], 15, 10, 19, 30, 24], 'circle-stroke-width': 2, 'circle-stroke-color': '#ffd47c' } })
-        instance.addLayer({ id: 'observation-cluster-label', type: 'symbol', source: 'wildsignal-observations', filter: ['has', 'point_count'], layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': ['Open Sans Semibold'], 'text-size': 10 }, paint: { 'text-color': '#fffaf0' } })
-        instance.addLayer({ id: 'observation-points', type: 'circle', source: 'wildsignal-observations', filter: ['!', ['has', 'point_count']], paint: { 'circle-color': '#f05a28', 'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 5, 13, 8, 18, 11], 'circle-stroke-color': '#ffc15a', 'circle-stroke-width': 2, 'circle-opacity': 0.95 } })
-        instance.addLayer({ id: 'observation-selected', type: 'circle', source: 'wildsignal-observations', filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'id'], '']], paint: { 'circle-color': 'rgba(84,217,244,.19)', 'circle-radius': 18, 'circle-stroke-color': '#54D9F4', 'circle-stroke-width': 2.5, 'circle-blur': 0.18 } })
+        instance.addLayer({ id: 'observation-clusters', type: 'circle', source: 'wildsignal-observations', filter: ['has', 'point_count'], paint: { 'circle-color': '#e76b4a', 'circle-radius': ['step', ['get', 'point_count'], 15, 10, 19, 30, 24], 'circle-stroke-width': 2, 'circle-stroke-color': '#efb66c' } })
+        instance.addLayer({ id: 'observation-cluster-label', type: 'symbol', source: 'wildsignal-observations', filter: ['has', 'point_count'], layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': ['Open Sans Semibold'], 'text-size': 10 }, paint: { 'text-color': '#f7e8ce' } })
+        instance.addLayer({ id: 'observation-points', type: 'circle', source: 'wildsignal-observations', filter: ['!', ['has', 'point_count']], paint: { 'circle-color': '#e76b4a', 'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 5, 13, 8, 18, 11], 'circle-stroke-color': '#efb66c', 'circle-stroke-width': 2, 'circle-opacity': 0.95 } })
+        instance.addLayer({ id: 'observation-selected', type: 'circle', source: 'wildsignal-observations', filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'id'], '']], paint: { 'circle-color': 'rgba(183,198,91,.19)', 'circle-radius': 18, 'circle-stroke-color': '#b7c65b', 'circle-stroke-width': 2.5, 'circle-blur': 0.18 } })
       }
       if (!instance.getSource('wildsignal-facilities')) {
         instance.addSource('wildsignal-facilities', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
-        instance.addLayer({ id: 'facility-polygons', type: 'fill', source: 'wildsignal-facilities', filter: ['==', ['geometry-type'], 'Polygon'], paint: { 'fill-color': '#54D9F4', 'fill-opacity': 0.12, 'fill-outline-color': '#8BAEFF' } })
-        instance.addLayer({ id: 'facility-lines', type: 'line', source: 'wildsignal-facilities', filter: ['==', ['geometry-type'], 'LineString'], paint: { 'line-color': '#74CDE2', 'line-width': 1.5, 'line-opacity': 0.78 } })
-        instance.addLayer({ id: 'facility-points', type: 'circle', source: 'wildsignal-facilities', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-color': '#243F56', 'circle-radius': 4, 'circle-stroke-color': '#A9DDF0', 'circle-stroke-width': 1.5, 'circle-opacity': 0.9 } })
+        instance.addLayer({ id: 'facility-polygons', type: 'fill', source: 'wildsignal-facilities', filter: ['==', ['geometry-type'], 'Polygon'], paint: { 'fill-color': '#d8b6d5', 'fill-opacity': 0.12, 'fill-outline-color': '#d8b6d5' } })
+        instance.addLayer({ id: 'facility-lines', type: 'line', source: 'wildsignal-facilities', filter: ['==', ['geometry-type'], 'LineString'], paint: { 'line-color': '#d8b6d5', 'line-width': 1.5, 'line-opacity': 0.78 } })
+        instance.addLayer({ id: 'facility-points', type: 'circle', source: 'wildsignal-facilities', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-color': '#35283a', 'circle-radius': 4, 'circle-stroke-color': '#d8b6d5', 'circle-stroke-width': 1.5, 'circle-opacity': 0.9 } })
       }
       const obsSource = instance.getSource('wildsignal-observations') as GeoJSONSource | undefined
       const facilitySource = instance.getSource('wildsignal-facilities') as GeoJSONSource | undefined
@@ -255,14 +254,6 @@ instance.on('click', 'facility-points', (event) => {
   const properties = feature.properties as Record<string, unknown>
 
   const facilityId = String(properties?.id ?? properties?.facility_id ?? '')
-  console.log(
-  'Matched facility:',
-  facilitiesRef.current.find(
-    (item) =>
-      item.id === facilityId ||
-      String(item.osm_id) === facilityId
-  )
-)
   const facility = facilitiesRef.current.find(
     (item) =>
       item.id === facilityId ||

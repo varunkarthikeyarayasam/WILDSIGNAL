@@ -17,31 +17,38 @@ const activityLabels: Record<string, string> = { recurring_across_observations: 
 
 function App() {
   const [intro, setIntro] = useState(true)
+  const [introExiting, setIntroExiting] = useState(false)
   useEffect(() => {
     if (!intro) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    const dismissOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setIntro(false) }
+    const dismissOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') dismissIntro() }
     window.addEventListener('keydown', dismissOnEscape)
     return () => {
       window.removeEventListener('keydown', dismissOnEscape)
       document.body.style.overflow = previousOverflow
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [intro])
   const dismissIntro = () => {
-  setIntro(false)
-
-  window.requestAnimationFrame(() => {
-    window.requestAnimationFrame(() => {
-      document.getElementById('wildsignal-dashboard')?.scrollIntoView({
-        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
-          ? 'auto'
-          : 'smooth',
-        block: 'start',
+    if (introExiting) return
+    setIntroExiting(true)
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const complete = () => {
+      setIntro(false)
+      setIntroExiting(false)
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          document.getElementById('wildsignal-dashboard')?.scrollIntoView({
+            behavior: reduced ? 'auto' : 'smooth',
+            block: 'start',
+          })
+        })
       })
-    })
-  })
-}
+    }
+    if (reduced) { complete(); return }
+    window.setTimeout(complete, 480)
+  }
   const [page, setPage] = useState<Page>('Overview')
   const [mobileNav, setMobileNav] = useState(false)
   const [searchText, setSearchText] = useState('')
@@ -131,8 +138,8 @@ function App() {
   }
   const resetFilters = () => { setFilters(emptyFilters); void loadWorkspace(emptyFilters) }
 
-  return <div className="app-shell">
-    {intro && <LivingEarthHero onExplore={dismissIntro} />}
+  return <div className={`app-shell ${introExiting ? 'dashboard-entering' : ''}`}>
+    {intro && <LivingEarthHero onExplore={dismissIntro} exiting={introExiting} />}
     <header className="topbar">
       <button className="brand" aria-label="WILDSIGNAL home" onClick={() => setPage('Overview')}><span className="brand-mark"><span /><span /><span /></span><span className="brand-copy"><b>WILDSIGNAL</b><small>EARTH OBSERVATION INTELLIGENCE</small></span></button>
       <nav className={mobileNav ? 'main-nav is-open' : 'main-nav'} aria-label="Main navigation">{navItems.map(({ label, icon: Icon }) => <button key={label} className={page === label ? 'nav-link active' : 'nav-link'} onClick={() => { if (label === 'Activity History' && page !== label) { setHistoryLoading(true); setHistoryError('') } setPage(label); setMobileNav(false) }}><Icon size={16} />{label}</button>)}</nav>
@@ -214,7 +221,7 @@ onFacilitySelect={(facility) => {
       <div className="empty-detail">
         <div className="empty-orbit"><Satellite size={21} /></div>
         <b>{available ? 'Select an observation or facility' : loading ? 'Loading stored observations' : 'No observation selected'}</b>
-        <p>Click an orange marker to inspect satellite data, or a blue marker to inspect mapped facility information.</p>
+        <p>Click a coral marker to inspect satellite data, or a lilac marker to inspect mapped facility information.</p>
         <span><ShieldCheck size={13} /> No unsupported attribution</span>
       </div>
     )
@@ -222,7 +229,7 @@ onFacilitySelect={(facility) => {
 </section>
         </aside>
         </div>
-        <section className="metrics-grid" aria-label="Observation summary"><Metric label="Observations in window" value={loading ? '…' : String(observationPage?.total ?? 0)} note="FIRMS records in selected dates" icon={<Flame />} accent="orange" /><Metric label="Industrial context candidates" value={loading ? '…' : String(industrialCount)} note="Nearby mapped OSM context; not attribution" icon={<MapIcon />} accent="blue" /><Metric label="Recurring observations" value={loading ? '…' : String(recurringCount)} note="Rows with distinct satellite/day groups within 500 m" icon={<Activity />} accent="teal" /><Metric label="Latest retrieval" value={dataRetrieved ? freshness.split(',')[0] : '—'} note={dataRetrieved ? freshness : 'No successful retrieval timestamp'} icon={<Clock3 />} accent="blue" /></section>
+        <section className="metrics-grid" aria-label="Observation summary"><Metric label="Observations in window" value={loading ? '…' : String(observationPage?.total ?? 0)} note="FIRMS records in selected dates" icon={<Flame />} accent="orange" /><Metric label="Industrial context candidates" value={loading ? '…' : String(industrialCount)} note="Nearby mapped OSM context; not attribution" icon={<MapIcon />} accent="lilac" /><Metric label="Recurring observations" value={loading ? '…' : String(recurringCount)} note="Rows with distinct satellite/day groups within 500 m" icon={<Activity />} accent="teal" /><Metric label="Latest retrieval" value={dataRetrieved ? freshness.split(',')[0] : '—'} note={dataRetrieved ? freshness : 'No successful retrieval timestamp'} icon={<Clock3 />} accent="blue" /></section>
         <div className="lower-note"><span className="note-icon"><CircleHelp size={15} /></span><span><b>Interpret with care.</b> Recurrence means separate acquisition dates within the spatial screening radius. Gaps between overpasses remain unobserved; proximity to an OSM feature does not confirm industrial origin.</span><button onClick={() => setPage('About the Data')}>Read methodology <ArrowUpRight size={13} /></button></div>
       </>}
       <footer className="footer"><span>WILDSIGNAL <i>·</i> Environmental observation, in context.</span><span>DATA RETRIEVED {dataRetrieved || '—'} <i>·</i> STUDY REGION</span></footer>
