@@ -420,9 +420,7 @@ def fetch_osm(force: bool = False) -> list[dict[str, Any]]:
    
     if failures == len(tiles):
         snapshot_path = (
-            Path(__file__).resolve().parents[1]
-            / "data"
-            / "osm_facilities.json"
+            Path(__file__).resolve().parents[1] / "osm_facilities.json"
         )
 
         try:
