@@ -22,7 +22,7 @@ function App() {
     if (!intro) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    const dismissOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') dismissIntro() }
+    const dismissOnEscape = () => setIntro(false)
     window.addEventListener('keydown', dismissOnEscape)
     return () => {
       window.removeEventListener('keydown', dismissOnEscape)
