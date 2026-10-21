@@ -166,45 +166,125 @@ def _facility_geometry(element: dict[str, Any]) -> tuple[dict[str, Any], float, 
     return None
 
 
+
 def fetch_osm(force: bool = False) -> list[dict[str, Any]]:
     state = source_states().get("osm")
     if not force and state and state.get("cache_until") and state["cache_until"] > time.time():
         return cached_facilities()
+
     west, south, east, north = REGION_BBOX
-    query = f"""[out:json][timeout:25];
-    (
-      nwr["landuse"="industrial"]({south},{west},{north},{east});
-      nwr["industrial"]({south},{west},{north},{east});
-      nwr["man_made"~"^(works|storage_tank|kiln)$"]({south},{west},{north},{east});
-      nwr["power"~"^(plant|substation)$"]({south},{west},{north},{east});
-      nwr["landuse"="quarry"]({south},{west},{north},{east});
-    );
-    out center tags;"""
-    try:
-        payload = json.loads(_request(OVERPASS_URL, urlencode({"data": query}).encode(), "application/x-www-form-urlencoded", OVERPASS_TIMEOUT_SECONDS))
-    except json.JSONDecodeError:
-        raise SourceError("invalid_provider_response", "OpenStreetMap Overpass returned malformed JSON.", 502) from None
-    if not isinstance(payload, dict) or not isinstance(payload.get("elements"), list) or payload.get("remark"):
-        raise SourceError("invalid_provider_response", "OpenStreetMap Overpass returned an incomplete or invalid response.", 502)
+    mid_lat = (south + north) / 2
+    mid_lon = (west + east) / 2
+
+    tiles = [
+        (south, west, mid_lat, mid_lon),
+        (south, mid_lon, mid_lat, east),
+        (mid_lat, west, north, mid_lon),
+        (mid_lat, mid_lon, north, east),
+    ]
+
+    collected: dict[tuple[str, int], dict[str, Any]] = {}
+    failures = 0
+
+    for tile_s, tile_w, tile_n, tile_e in tiles:
+        query = f"""[out:json][timeout:20];
+        (
+          nwr["landuse"="industrial"]({tile_s},{tile_w},{tile_n},{tile_e});
+          nwr["industrial"]({tile_s},{tile_w},{tile_n},{tile_e});
+          nwr["man_made"~"^(works|storage_tank|kiln)$"]({tile_s},{tile_w},{tile_n},{tile_e});
+          nwr["power"~"^(plant|substation)$"]({tile_s},{tile_w},{tile_n},{tile_e});
+          nwr["landuse"="quarry"]({tile_s},{tile_w},{tile_n},{tile_e});
+        );
+        out center tags;"""
+
+        try:
+            payload = json.loads(
+                _request(
+                    OVERPASS_URL,
+                    urlencode({"data": query}).encode(),
+                    "application/x-www-form-urlencoded",
+                    min(OVERPASS_TIMEOUT_SECONDS, 25),
+                )
+            )
+        except json.JSONDecodeError:
+            failures += 1
+            continue
+        except SourceError:
+            failures += 1
+            continue
+
+        if (
+            not isinstance(payload, dict)
+            or not isinstance(payload.get("elements"), list)
+            or payload.get("remark")
+        ):
+            failures += 1
+            continue
+
+        for element in payload["elements"]:
+            if not isinstance(element, dict):
+                continue
+            osm_type = element.get("type")
+            osm_id = element.get("id")
+            if osm_type in {"node", "way", "relation"} and isinstance(osm_id, int):
+                collected[(osm_type, osm_id)] = element
+
+        if len(collected) == 0:
+            time.sleep(1)
+
+    if not collected and failures:
+        raise SourceError(
+            "upstream_timeout_or_network",
+            "OpenStreetMap requests timed out or returned no usable data. Retry later.",
+            503,
+        )
+
     retrieved = utc_now()
     features: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for element in payload["elements"]:
-        if not isinstance(element, dict):
-            continue
+
+    for element in collected.values():
         normalized = _facility_geometry(element)
         if not normalized:
             continue
+
         geometry, lat, lon = normalized
         tags = element.get("tags") or {}
-        osm_type, osm_id = str(element.get("type", "unknown")), int(element.get("id", 0))
+        osm_type = str(element.get("type", "unknown"))
+        osm_id = int(element.get("id", 0))
         identity = f"{osm_type}/{osm_id}"
+
         if osm_type not in {"node", "way", "relation"} or osm_id <= 0 or identity in seen:
             continue
+
         seen.add(identity)
-        features.append({"id": identity, "osm_type": osm_type, "osm_id": osm_id,
-            "name": tags.get("name"), "tags": tags, "geometry": geometry,
-            "latitude": lat, "longitude": lon, "retrieved_at": retrieved})
+        features.append({
+            "id": identity,
+            "osm_type": osm_type,
+            "osm_id": osm_id,
+            "name": tags.get("name"),
+            "tags": tags,
+            "geometry": geometry,
+            "latitude": lat,
+            "longitude": lon,
+            "retrieved_at": retrieved,
+        })
+
+    if failures == len(tiles):
+        raise SourceError(
+            "upstream_timeout_or_network",
+            "All OpenStreetMap tile requests failed. Retry later.",
+            503,
+        )
+
     upsert_facilities(features)
-    set_source_state("osm", "available", None, retrieved, len(features), time.time() + OSM_CACHE_SECONDS)
+    set_source_state(
+        "osm",
+        "available",
+        None,
+        retrieved,
+        len(features),
+        time.time() + OSM_CACHE_SECONDS,
+    )
     return features
+
