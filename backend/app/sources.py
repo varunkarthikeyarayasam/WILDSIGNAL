@@ -1,9 +1,9 @@
 
 from __future__ import annotations
-from pathlib import Path
 import csv
 import hashlib
 import io
+from pathlib import Path
 import json
 import time
 from datetime import date, datetime, timedelta
@@ -457,9 +457,6 @@ def fetch_osm(force: bool = False) -> list[dict[str, Any]]:
             outcome="snapshot_fallback",
         )
         return cached_facilities()
-
-    retrieved = utc_now()
-    features: list[dict[str, Any]] = []
 
     retrieved = utc_now()
     features: list[dict[str, Any]] = []
