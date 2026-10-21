@@ -138,7 +138,15 @@ def fetch_osm(force: bool = False) -> list[dict[str, Any]]:
     if not force and state and state.get("cache_until") and state["cache_until"] > time.time():
         return cached_facilities()
     west, south, east, north = REGION_BBOX
-    query = f"[out:json][timeout:{min(30, OVERPASS_TIMEOUT_SECONDS)}];(nwr[\"landuse\"~\"^(industrial|commercial|farmland|forest|meadow|orchard|vineyard)$\"]({south},{west},{north},{east});nwr[\"industrial\"]({south},{west},{north},{east});nwr[\"man_made\"~\"^(works|storage_tank|kiln)$\"]({south},{west},{north},{east});nwr[\"power\"~\"^(plant|substation)$\"]({south},{west},{north},{east});nwr[\"landuse\"=\"quarry\"]({south},{west},{north},{east}););out center tags geom;"
+    query = f"""[out:json][timeout:25];
+    (
+      nwr["landuse"="industrial"]({south},{west},{north},{east});
+      nwr["industrial"]({south},{west},{north},{east});
+      nwr["man_made"~"^(works|storage_tank|kiln)$"]({south},{west},{north},{east});
+      nwr["power"~"^(plant|substation)$"]({south},{west},{north},{east});
+      nwr["landuse"="quarry"]({south},{west},{north},{east});
+    );
+    out center tags;"""
     try:
         payload = json.loads(_request(OVERPASS_URL, urlencode({"data": query}).encode(), "application/x-www-form-urlencoded", OVERPASS_TIMEOUT_SECONDS))
     except json.JSONDecodeError:
