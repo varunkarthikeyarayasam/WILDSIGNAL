@@ -1,6 +1,6 @@
 
 from __future__ import annotations
-
+from pathlib import Path
 import csv
 import hashlib
 import io
@@ -11,7 +11,6 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 from typing import Any
-from pathlib import Path
 
 from .analysis import parse_acquisition, parse_number
 from .config import (
@@ -418,12 +417,49 @@ def fetch_osm(force: bool = False) -> list[dict[str, Any]]:
             ):
                 collected[(osm_type, osm_id)] = element
 
+   
     if failures == len(tiles):
-        raise SourceError(
-            "upstream_timeout_or_network",
-            "All OpenStreetMap tile requests failed. Previously stored facilities were preserved.",
-            503,
+        snapshot_path = (
+            Path(__file__).resolve().parents[1]
+            / "data"
+            / "osm_facilities.json"
         )
+
+        try:
+            snapshot = json.loads(
+                snapshot_path.read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError) as exc:
+            raise SourceError(
+                "upstream_timeout_or_network",
+                f"Live Overpass failed and the OSM snapshot could not be loaded: {exc}",
+                503,
+            ) from exc
+
+        if not isinstance(snapshot, list) or not snapshot:
+            raise SourceError(
+                "snapshot_unavailable",
+                "The bundled OSM facility snapshot is empty or invalid.",
+                503,
+            )
+
+        upsert_facilities(snapshot)
+
+        retrieved = utc_now()
+        set_source_state(
+            "osm",
+            "available",
+            "Using bundled OSM snapshot; live Overpass is unreachable.",
+            retrieved,
+            len(snapshot),
+            time.time() + OSM_CACHE_SECONDS,
+            error_category="snapshot_fallback",
+            outcome="snapshot_fallback",
+        )
+        return cached_facilities()
+
+    retrieved = utc_now()
+    features: list[dict[str, Any]] = []
 
     retrieved = utc_now()
     features: list[dict[str, Any]] = []
