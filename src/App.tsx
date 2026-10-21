@@ -1,9 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Activity, ArrowUpRight, CalendarDays, ChevronDown, CircleHelp, Clock3, Database, Download, Flame, Layers3, LocateFixed, Map as MapIcon, Menu, Minus, Play, Plus, Radio, RefreshCw, Satellite, Search, ShieldCheck, SlidersHorizontal, Waves, X } from 'lucide-react'
+import { Activity, ArrowUpRight, CalendarDays, ChevronDown, CircleHelp, Clock3, Database, Download, Flame, Layers as Layers3, LocateFixed, Map as MapIcon, Menu, Minus, Play, Plus, Radio, RefreshCw, Satellite, Search, ShieldCheck, SlidersHorizontal, Waves, X } from 'lucide-react'
 import { AboutData } from './features/activity/AboutData'
 import { getFacilities, getHistory, getObservations, getStatus, refreshData, type Facility, type Filters, type History, type Observation, type ObservationPage, type ServiceStatus } from './lib/api'
 import './styles.css'
-import { LivingEarthHero } from './components/LivingEarthHero'
+import { LivingEarthHero } from './Components/LivingEarthHero'
 
 const MapView = lazy(() => import('./features/investigation/MapView').then((module) => ({ default: module.MapView })))
 type Page = 'Overview' | 'Investigation' | 'Activity History' | 'About the Data'
