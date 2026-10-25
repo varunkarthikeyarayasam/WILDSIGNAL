@@ -1,108 +1,34 @@
-import { Activity, Database, MapPin, Satellite, ShieldCheck, AlertTriangle } from 'lucide-react'
+import { Activity, Clock3, Database, MapPin, Satellite, ShieldCheck } from 'lucide-react'
 import type { ServiceStatus } from '../../lib/api'
+import { describeSource } from '../../lib/sourceStatus'
+
+const sources = [
+  { icon: Satellite, title: 'NASA FIRMS', text: 'The Fire Information for Resource Management System distributes active fire and thermal anomaly observations from satellite instruments. Each record represents an observation at an overpass time; sensor attributes and confidence depend on the source. A detection is evidence of observed heat, not proof of what produced it.' },
+  { icon: MapPin, title: 'OpenStreetMap', text: 'Mapped facilities and geographic features provide context. Coverage and tagging vary by place, and an unmapped facility may still exist. OSM proximity alone is never evidence of industrial origin, and proximity between an observation and a facility does not establish that the facility caused it.' },
+  { icon: Database, title: 'Facility data and fallbacks', text: 'Facility records are loaded through the backend. When the live provider cannot be reached, the app shows only the records already stored and reports the source as unavailable. A bundled snapshot, wherever a deployment provides one, is a fallback and not a continuously refreshed source; it is labelled as such in the source status below, never as live.' },
+  { icon: Activity, title: 'Recurrence over time', text: 'A recurring source means multiple detections across separate observed overpasses during a stated period. Clouds, orbital timing, sensor sensitivity and gaps mean recurrence does not prove continuous activity.' },
+  { icon: Clock3, title: 'Observation time and retrieval time', text: 'Every record carries the time the satellite observed it and, separately, the time WILDSIGNAL retrieved it. Activity History groups records by acquisition date; retrieval time describes data freshness and is never used as an observation date.' },
+  { icon: ShieldCheck, title: 'Classification and uncertainty', text: 'Source category is an evidence-based interpretation, distinct from the satellite’s own confidence attribute and from activity status. Sparse or ambiguous evidence should remain uncertain, and an empty result is not evidence that nothing burned.' },
+]
 
 export function AboutData({ status }: { status: ServiceStatus | null }) {
-  const firms = status?.sources.firms
-  const osm = status?.sources.osm
-
-  return <div className="about-editorial">
-    {/* Editorial intro — full width */}
-    <section className="about-intro panel">
-      <div className="section-kicker">METHODOLOGY & PROVENANCE</div>
+  const rows = [
+    { name: 'NASA FIRMS', kind: 'Thermal observations', summary: describeSource(status?.sources.firms) },
+    { name: 'OpenStreetMap', kind: 'Geographic context', summary: describeSource(status?.sources.osm) },
+  ]
+  return <div className="about-layout">
+    <section className="about-intro">
+      <div className="section-kicker">Methodology & provenance</div>
       <h2>Every signal has a source.<br /><em>Every conclusion has limits.</em></h2>
-      <p>WILDSIGNAL keeps satellite measurements, mapped context and interpretation separate. What follows reflects the current backend state — no fallback or illustrative observations are bundled.</p>
-      <div className="about-status-row">
-        <span className="method-note"><Database size={15} /> API {status ? 'connected' : 'unavailable'}</span>
-        <span className="method-note">FIRMS {firms?.status || 'not fetched'} ({firms?.record_count ?? 0} stored)</span>
-        <span className="method-note">OSM {osm?.status || 'not fetched'} ({osm?.record_count ?? 0} mapped features)</span>
+      <p>WILDSIGNAL keeps satellite measurements, mapped context and interpretation separate. No fallback or illustrative observations are bundled; everything below reflects the current backend state.</p>
+      <div className="state-list" aria-label="Current backend state">
+        <p className={status ? 'state-api is-ok' : 'state-api is-down'}><i /> API {status ? 'connected' : 'unavailable'}</p>
+        {rows.map(({ name, kind, summary }) => <div className={`state-row tone-${summary.tone}`} key={name}>
+          <i /><div><b>{name}</b><small>{kind}</small></div><em>{summary.label}</em><p>{summary.detail}</p>
+        </div>)}
       </div>
     </section>
-
-    {/* Section 01 — asymmetric: large text left, visual stat right */}
-    <div className="about-section about-section--01">
-      <div className="about-section-text">
-        <span className="about-section-number">01</span>
-        <div className="about-section-icon coral"><Satellite size={20} /></div>
-        <h3>NASA FIRMS <em>— observed thermal anomalies</em></h3>
-        <p>The Fire Information for Resource Management System distributes active fire and thermal anomaly observations from satellite instruments. Each record represents a single observation at an overpass time — not a continuous measurement. Sensor attributes and confidence depend on the instrument, the scan angle, and atmospheric conditions at the moment of acquisition.</p>
-        <p className="about-subtext">VIIRS instruments on NOAA-20, NOAA-21, and Suomi-NPP provide the near-real-time feeds used here. Each detection includes brightness temperatures (T4, T5), fire radiative power, and a provider-assigned confidence value.</p>
-      </div>
-      <div className="about-section-aside">
-        <div className="about-stat-block">
-          <span className="metric-label">FIRMS STATUS</span>
-          <strong>{firms?.status || 'not fetched'}</strong>
-          <small>{firms?.record_count ?? 0} stored records</small>
-          {firms?.retrieved_at && <small className="about-stat-time">Retrieved {firms.retrieved_at}</small>}
-          {firms?.message && <small className="about-stat-warn">{firms.message}</small>}
-        </div>
-      </div>
-    </div>
-
-    {/* Section 02 — reversed asymmetry */}
-    <div className="about-section about-section--02">
-      <div className="about-section-aside">
-        <div className="about-stat-block lilac">
-          <span className="metric-label">OSM STATUS</span>
-          <strong>{osm?.status || 'not fetched'}</strong>
-          <small>{osm?.record_count ?? 0} mapped features</small>
-          {osm?.message && <small className="about-stat-warn">{osm.message}</small>}
-        </div>
-      </div>
-      <div className="about-section-text">
-        <span className="about-section-number">02</span>
-        <div className="about-section-icon lilac"><MapPin size={20} /></div>
-        <h3>OpenStreetMap <em>— geographic context, not attribution</em></h3>
-        <p>Mapped facilities and geographic features provide context for interpreting where thermal anomalies occur. Coverage and tagging vary by place — a facility absent from OSM may still exist, and a mapped feature's tags may be incomplete or outdated.</p>
-        <p className="about-subtext">Proximity to an OSM feature does not confirm industrial origin. The mapped context narrows the search space; it does not by itself identify a source.</p>
-      </div>
-    </div>
-
-    {/* Section 03 — full width with diagram */}
-    <div className="about-section about-section--03">
-      <div className="about-section-text">
-        <span className="about-section-number">03</span>
-        <div className="about-section-icon teal"><Activity size={20} /></div>
-        <h3>Recurrence over time <em>— repeated ≠ continuous</em></h3>
-        <p>A recurring source means multiple detections across separate observed overpasses during a stated period. Clouds, orbital timing, sensor sensitivity and gaps mean recurrence does not prove continuous activity. An empty day in the record does not imply no thermal activity occurred — only that no overpass detected any.</p>
-      </div>
-      <div className="about-diagram">
-        <div className="about-diagram-track">
-          <div className="about-diagram-node"><span>Day 1</span><i className="coral" /></div>
-          <div className="about-diagram-gap"><span>unobserved</span></div>
-          <div className="about-diagram-node"><span>Day 3</span><i className="coral" /></div>
-          <div className="about-diagram-gap"><span>unobserved</span></div>
-          <div className="about-diagram-node"><span>Day 7</span><i className="coral" /></div>
-        </div>
-        <small>Each coral marker is one satellite overpass detection. Gaps are unobserved periods, not evidence of absence.</small>
-      </div>
-    </div>
-
-    {/* Section 04 — full width, cautionary */}
-    <div className="about-section about-section--04">
-      <div className="about-section-text">
-        <span className="about-section-number">04</span>
-        <div className="about-section-icon amber"><ShieldCheck size={20} /></div>
-        <h3>Classification & uncertainty <em>— interpretation with boundaries</em></h3>
-        <p>Source category is an evidence-based interpretation, distinct from the satellite's own confidence attribute and from activity status. Sparse or ambiguous evidence should remain uncertain. A thermal anomaly classified as an "industrial-associated candidate" is not a finding of industrial fire — it is a flag for further investigation.</p>
-      </div>
-      <div className="about-caution">
-        <AlertTriangle size={22} />
-        <div>
-          <b>What this data cannot prove</b>
-          <ul>
-            <li>The cause of a thermal anomaly</li>
-            <li>Continuous activity between overpasses</li>
-            <li>Industrial origin from OSM proximity alone</li>
-            <li>Absence of fire on days with no detection</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    {/* Provenance strip — retained fields */}
-    <section className="provenance-strip">
-      <span><Database size={15} /> SOURCE RECORDS</span>
-      <p>Observation time, satellite and instrument, source feed, provider confidence attributes and retrieval time are retained with records. Historic observations are labeled as stored acquisitions; retrieval time is distinct from acquisition time.</p>
-    </section>
+    <div className="source-grid">{sources.map(({ icon: Icon, title, text }, index) => <article className="source-card" key={title}><span className="source-index">0{index + 1}</span><div className="source-icon"><Icon size={18} /></div><h3>{title}</h3><p>{text}</p></article>)}</div>
+    <section className="provenance-strip"><span><Database size={15} /> Source records</span><p>Observation time, satellite and instrument, source feed, provider confidence attributes and retrieval time are retained with records. Historic observations are labelled as stored acquisitions; retrieval time is distinct from acquisition time.</p></section>
   </div>
 }

@@ -1,0 +1,45 @@
+/* ── 02 · Reset, typography, controls ───────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html { background: var(--ws-plum); -webkit-text-size-adjust: 100%; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--ws-plum); color: var(--ws-text); font: 400 var(--ws-fs-body)/1.55 var(--ws-font-ui); font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+h1, h2, h3, h4, p, ul, ol, figure { margin: 0; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: 0; padding: 0; }
+button:disabled { cursor: not-allowed; }
+:focus-visible { outline: none; box-shadow: var(--ws-focus); border-radius: var(--ws-radius-s); }
+::selection { background: rgba(231, 107, 74, .4); }
+@supports (scrollbar-width: thin) { * { scrollbar-width: thin; scrollbar-color: rgba(216, 182, 213, .28) transparent; } }
+
+/* type roles */
+.type-display, .page-heading h1, .map-header h2, .method-layout h2, .method-layout h3, .about-layout h2, .about-layout h3, .empty-detail b, .metric-card strong { font-family: var(--ws-font-display); font-weight: 350; font-optical-sizing: auto; letter-spacing: -.015em; }
+.section-kicker, .field-label, .eyebrow, .legend-title { font: 500 var(--ws-fs-label)/1.3 var(--ws-font-ui); letter-spacing: .1em; text-transform: uppercase; color: var(--ws-text-3); }
+.mono, .detail-row b, .selected-coordinates b, .record-copy small, .date-chip, .map-layer-label { font-family: var(--ws-font-mono); }
+
+/* buttons */
+.button, .icon-button, .text-button, .apply-button, .inline-link, .collapse-button { transition: background var(--ws-dur-fast), border-color var(--ws-dur-fast), color var(--ws-dur-fast), box-shadow var(--ws-dur), transform var(--ws-dur-fast); }
+.button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 16px; border-radius: var(--ws-radius-pill); border: 1px solid var(--ws-line-strong); font-size: var(--ws-fs-small); font-weight: 600; white-space: nowrap; }
+.button:active:not(:disabled), .apply-button:active:not(:disabled) { transform: translateY(1px); }
+.button:disabled, .apply-button:disabled { opacity: .55; }
+.button-dark { color: var(--ws-text); background: rgba(247, 232, 206, .04); }
+.button-dark:hover { background: rgba(216, 182, 213, .12); border-color: var(--ws-lilac); }
+.button-refresh { color: var(--ws-plum); background: var(--ws-bone); border-color: var(--ws-bone); box-shadow: 0 10px 30px rgba(231, 107, 74, .18); }
+.button-refresh:hover:not(:disabled) { background: #fff3dc; box-shadow: 0 14px 38px rgba(231, 107, 74, .34); }
+.icon-button, .collapse-button { display: grid; place-items: center; width: 40px; height: 40px; border-radius: var(--ws-radius-m); color: var(--ws-text-2); border: 1px solid var(--ws-line); background: rgba(247, 232, 206, .03); }
+.collapse-button { width: 32px; height: 32px; border-radius: var(--ws-radius-s); }
+.icon-button:hover, .collapse-button:hover { color: var(--ws-text); border-color: var(--ws-line-strong); background: rgba(216, 182, 213, .12); }
+.text-button, .inline-link { display: inline-flex; align-items: center; gap: 6px; color: var(--ws-lichen); font-size: var(--ws-fs-small); font-weight: 600; padding: 4px 6px; margin: -4px -6px; }
+.text-button:hover, .inline-link:hover { color: var(--ws-bone); }
+.spin { animation: ws-spin 1s linear infinite; }
+@keyframes ws-spin { to { transform: rotate(360deg); } }
+
+/* form controls */
+input[type='date'] { color-scheme: dark; }
+input[type='checkbox'] { accent-color: var(--ws-coral); width: 16px; height: 16px; }
+.select-wrap, .date-fields label, .record-search { border: 1px solid var(--ws-line); border-radius: var(--ws-radius-m); background: rgba(23, 14, 24, .55); transition: border-color var(--ws-dur-fast), box-shadow var(--ws-dur-fast); }
+.select-wrap:hover, .date-fields label:hover, .record-search:hover { border-color: var(--ws-line-strong); }
+.select-wrap:focus-within, .date-fields label:focus-within, .record-search:focus-within { border-color: var(--ws-lilac); box-shadow: 0 0 0 3px rgba(216, 182, 213, .2); }
+.select-wrap input:focus-visible, .select-wrap select:focus-visible, .date-fields input:focus-visible, .record-search input:focus-visible { box-shadow: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+}

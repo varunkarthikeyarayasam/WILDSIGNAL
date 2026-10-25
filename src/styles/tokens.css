@@ -1,0 +1,76 @@
+/* ── 01 · Design tokens ─────────────────────────────────────────────────────
+   Single source of truth. Components consume tokens; they do not define colours, fonts or timings. */
+:root {
+  color-scheme: dark;
+
+  /* brand palette */
+  --ws-plum: #211622;          /* cosmic background */
+  --ws-lichen: #b7c65b;        /* decorative filaments and restrained highlights, never a data class */
+  --ws-coral: #e76b4a;         /* thermal accents */
+  --ws-lilac: #d8b6d5;         /* haze, depth, hairlines */
+  --ws-bone: #f7e8ce;          /* primary text and editorial contrast */
+
+  /* plum surface ramp (derived) */
+  --ws-plum-deep: #170e18;
+  --ws-plum-raised: #2b1d2d;
+  --ws-plum-high: #392a3c;
+
+  /* text roles (all ≥ 4.5:1 on the surfaces above) */
+  --ws-text: var(--ws-bone);
+  --ws-text-2: #d9cbb6;
+  --ws-text-3: #b4a3b4;
+
+  /* lines */
+  --ws-line: rgba(216, 182, 213, .14);
+  --ws-line-strong: rgba(216, 182, 213, .28);
+  --ws-rule: rgba(247, 232, 206, .1);
+
+  /* data semantics — these mirror the colours drawn on the map and must not be reassigned to brand colours */
+  --ws-observation: #f05a28;        /* orange satellite-observation markers */
+  --ws-observation-ring: #ffc15a;
+  --ws-facility: #54d9f4;           /* blue mapped-facility markers */
+  --ws-selection: #54d9f4;          /* map selection ring */
+
+  /* service status (always paired with a text label) */
+  --ws-status-ok: var(--ws-lichen);
+  --ws-status-warn: #efb66c;
+  --ws-status-error: #ef6b5e;
+  --ws-status-idle: #9d8c9f;
+
+  /* type */
+  --ws-font-display: 'Fraunces', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --ws-font-ui: 'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --ws-font-mono: 'DM Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --ws-fs-label: .75rem;    /* 12px · technical labels */
+  --ws-fs-small: .8125rem;  /* 13px · metadata */
+  --ws-fs-body: .9375rem;   /* 15px */
+  --ws-fs-lead: 1.0625rem;  /* 17px */
+
+  /* space, shape, depth */
+  --ws-space-1: 4px; --ws-space-2: 8px; --ws-space-3: 12px; --ws-space-4: 16px; --ws-space-5: 24px; --ws-space-6: 32px; --ws-space-7: 48px;
+  --ws-radius-s: 6px; --ws-radius-m: 10px; --ws-radius-l: 16px; --ws-radius-pill: 999px;
+  --ws-shadow-panel: 0 18px 44px rgba(10, 5, 12, .38);
+  --ws-shadow-lift: 0 24px 60px rgba(10, 5, 12, .5);
+  --ws-surface: rgba(43, 29, 45, .72);        /* open panels */
+  --ws-surface-solid: #2b1d2d;
+  --ws-surface-raised: rgba(57, 42, 60, .86); /* selected record, menus */
+
+  /* layout */
+  --ws-page-max: 1480px;
+  --ws-page-gutter: clamp(16px, 3.4vw, 56px);
+  --ws-side-width: 392px;
+  --ws-topbar-h: 76px;
+
+  /* motion */
+  --ws-ease-out: cubic-bezier(.16, 1, .3, 1);
+  --ws-ease-inout: cubic-bezier(.65, 0, .35, 1);
+  --ws-dur-fast: 140ms; --ws-dur: 260ms; --ws-dur-slow: 700ms;
+
+  /* stacking */
+  --ws-z-map-ui: 3; --ws-z-topbar: 20; --ws-z-menu: 25; --ws-z-toast: 40;
+
+  /* focus */
+  --ws-focus: 0 0 0 2px var(--ws-plum), 0 0 0 4px var(--ws-lilac);
+}
+@media (max-width: 900px) { :root { --ws-topbar-h: 68px; } }
+@media (max-width: 760px) { :root { --ws-topbar-h: 62px; } }

@@ -56,7 +56,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     response = await fetch(`${apiBaseUrl}${path}`, { ...init, headers: { Accept: 'application/json', ...init?.headers } })
   } catch {
-    throw new Error(`WILDSIGNAL API is unreachable at ${apiBaseUrl}. Start the FastAPI backend or set VITE_API_BASE_URL to its address.`)
+    const missingProductionUrl = import.meta.env.PROD && /^https?:\/\/(localhost|127\.0\.0\.1)\b/.test(apiBaseUrl)
+    throw new Error(missingProductionUrl
+      ? `This production build is pointing at ${apiBaseUrl} because VITE_API_BASE_URL was not set when it was built. Set it to the deployed backend URL and redeploy the frontend.`
+      : `WILDSIGNAL API is unreachable at ${apiBaseUrl}. Start the FastAPI backend or set VITE_API_BASE_URL to its address.`)
   }
   if (!response.ok) {
     const detail = await response.json().catch(() => null) as { detail?: string } | null

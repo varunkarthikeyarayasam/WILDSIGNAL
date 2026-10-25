@@ -1,0 +1,191 @@
+/* ──────────────────────────────────────────────────────────────────────────────
+   WILDSIGNAL · Phase 1 hero — "Venom & Velvet"
+   Black plum #211622 · acid lichen #B7C65B · molten coral #E76B4A · dusty lilac #D8B6D5 · warm bone #F7E8CE
+   Scoped to .ws-hero*. Palette, fonts and easing come from styles/tokens.css.
+   Lichen is decorative only; it never encodes data. Coral/orange map markers keep their existing meaning.
+   ────────────────────────────────────────────────────────────────────────────── */
+
+.ws-hero {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overscroll-behavior: none;
+  touch-action: none; /* the page is locked while the hero shows; the Enter button is the way in */
+  color: var(--ws-bone);
+}
+
+/* ── stage: fills the viewport; nothing here reads or reacts to scroll position ── */
+.ws-hero__stage {
+  --ws-pr: min(37vw, 32vh);
+  --ws-py: 39%;
+  --ws-mx: 0;
+  --ws-my: 0;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  isolation: isolate;
+  contain: layout paint;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 38%, rgba(216, 182, 213, .17), transparent 70%),
+    radial-gradient(ellipse 48% 40% at 16% 80%, rgba(183, 198, 91, .075), transparent 70%),
+    radial-gradient(ellipse 44% 38% at 88% 20%, rgba(231, 107, 74, .08), transparent 70%),
+    linear-gradient(180deg, #170e18 0%, #211622 46%, #150c16 100%);
+}
+@supports (height: 100svh) {
+  .ws-hero__stage { --ws-pr: min(37vw, 32svh); }
+}
+@media (max-width: 760px) {
+  .ws-hero__stage { --ws-pr: min(43vw, 26vh); --ws-py: 33%; }
+  @supports (height: 100svh) { .ws-hero__stage { --ws-pr: min(43vw, 26svh); } }
+}
+@media (max-height: 560px) and (orientation: landscape) {
+  .ws-hero__stage { --ws-pr: 30vh; --ws-py: 45%; }
+  @supports (height: 100svh) { .ws-hero__stage { --ws-pr: 30svh; } }
+}
+
+.ws-hero__void, .ws-hero__grain, .ws-hero__vignette, .ws-hero__fade { position: absolute; inset: 0; pointer-events: none; }
+.ws-hero__void { z-index: 0; }
+.ws-hero__grain {
+  z-index: 3; opacity: .07; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .8 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.ws-hero__vignette { z-index: 3; background: radial-gradient(ellipse at 50% 42%, transparent 50%, rgba(10, 5, 12, .62) 100%); }
+/* the hero's plum void settles into the dashboard surface at the bottom edge, so the boundary is a gradient, not a seam */
+.ws-hero__fade { z-index: 4; top: auto; height: 40%; background: linear-gradient(180deg, transparent, rgba(33, 22, 34, .55) 55%, var(--ws-plum) 100%); }
+
+/* ── planet box: one square that holds every planet layer, so orbits, haze and canvas always align ── */
+.ws-hero__planetbox {
+  position: absolute; z-index: 2; left: 50%; top: var(--ws-py);
+  width: calc(var(--ws-pr) * 2.9); aspect-ratio: 1; transform: translate(-50%, -50%); pointer-events: none;
+}
+.ws-hero__enter { position: absolute; inset: 0; animation: ws-planet-in 1.9s var(--ws-ease-out) both; }
+.ws-hero__move {
+  position: absolute; inset: 0; will-change: transform, opacity;
+  transform: translate3d(calc(var(--ws-mx) * -14px), calc(var(--ws-my) * -10px), 0);
+}
+.ws-hero__haze {
+  position: absolute; inset: -8%; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(216, 182, 213, .26), rgba(216, 182, 213, .09) 52%, transparent 78%);
+}
+.ws-hero__orbits, .ws-hero__filaments { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.ws-hero__filaments { opacity: .9; }
+.ws-orbit path { stroke-width: 1; }
+.ws-orbit--lilac path { stroke: rgba(216, 182, 213, .42); }
+.ws-orbit--lichen path { stroke: rgba(183, 198, 91, .5); }
+.ws-orbit__node { fill: var(--ws-lichen); animation: ws-pulse 5.2s ease-in-out infinite; }
+.ws-orbit__node--b { fill: var(--ws-lilac); animation-delay: -2.4s; }
+.ws-fil__trace { stroke: rgba(183, 198, 91, .16); stroke-width: 1; }
+.ws-fil__flow { stroke: url(#ws-fil); stroke-width: 1.4; stroke-dasharray: 16 84; stroke-dashoffset: 0; animation: ws-flow 9s linear infinite; }
+
+/* canvas + static fallback share the planet's disc (diameter = 100% / 1.45) */
+.ws-hero__canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  pointer-events: auto; cursor: grab; touch-action: none; opacity: 0; transition: opacity 1.1s ease;
+}
+.ws-hero__canvas:active { cursor: grabbing; }
+.is-live .ws-hero__canvas { opacity: 1; }
+.ws-hero__fallback {
+  position: absolute; inset: 17.24%; border-radius: 50%; overflow: hidden; transition: opacity 1.1s ease;
+  background:
+    radial-gradient(circle at 30% 26%, rgba(247, 232, 206, .8) 0, rgba(216, 182, 213, .55) 15%, rgba(126, 78, 124, .55) 40%, #2a1b2b 68%, #150c16 100%);
+  box-shadow: inset -42px -34px 90px rgba(10, 5, 12, .85), inset 12px 10px 42px rgba(216, 182, 213, .22), 0 0 90px rgba(216, 182, 213, .2);
+}
+.ws-hero__fallback svg { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .8; mix-blend-mode: screen; }
+.is-live .ws-hero__fallback { opacity: 0; }
+
+/* ── copy ── */
+.ws-hero__top {
+  position: absolute; z-index: 8; inset: 0 0 auto 0; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: clamp(16px, 3vh, 30px) clamp(20px, 4.2vw, 72px);
+  font: 500 11px/1.2 var(--ws-font-mono); letter-spacing: .08em; color: rgba(247, 232, 206, .72);
+  animation: ws-fade 1.2s .9s ease both;
+}
+.ws-hero__kicker { display: inline-flex; align-items: center; gap: 10px; text-transform: uppercase; }
+.ws-hero__place { margin-left: auto; text-transform: uppercase; }
+.ws-hero__skip { background: none; border: 0; font: inherit; cursor: pointer; padding: 6px 2px; color: var(--ws-bone); text-decoration: underline; text-decoration-color: rgba(247, 232, 206, .35); text-underline-offset: 5px; transition: text-decoration-color .2s, color .2s; }
+.ws-hero__skip:hover { text-decoration-color: var(--ws-lichen); color: #fff; }
+.ws-hero__skip:focus-visible, .ws-hero__cta:focus-visible { outline: 2px solid var(--ws-lilac); outline-offset: 4px; box-shadow: none; }
+
+.ws-hero__copy {
+  position: absolute; z-index: 6; inset: auto 0 0 0; display: grid; gap: clamp(12px, 2.2vh, 24px);
+  padding: 0 clamp(20px, 4.2vw, 72px) clamp(26px, 6vh, 60px);
+}
+.ws-hero__wordmark {
+  display: flex; margin: 0; padding-bottom: .1em; overflow: hidden;
+  font-family: var(--ws-font-display); font-weight: 300; font-optical-sizing: auto;
+  font-size: clamp(2.6rem, 13.4vw, 15rem); line-height: .84; letter-spacing: -.045em; color: var(--ws-bone);
+}
+.ws-hero__letter { display: inline-block; transform: translate3d(0, 108%, 0); animation: ws-rise 1.15s calc(.55s + var(--i, 0) * 55ms) var(--ws-ease-out) forwards; }
+.ws-hero__row { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 28rem); align-items: end; gap: clamp(20px, 5vw, 80px); }
+.ws-hero__headline {
+  margin: 0; max-width: 22ch; font-family: var(--ws-font-display); font-style: italic; font-weight: 300; font-optical-sizing: auto;
+  font-size: clamp(1.45rem, 2.7vw, 2.55rem); line-height: 1.1; letter-spacing: -.012em; color: var(--ws-bone);
+  animation: ws-fade 1.3s 1.25s ease both;
+}
+.ws-hero__aside { display: grid; gap: 18px; justify-items: start; animation: ws-fade 1.3s 1.45s ease both; }
+.ws-hero__support { margin: 0; max-width: 42ch; font-size: clamp(.9rem, 1.05vw, 1rem); line-height: 1.6; color: rgba(247, 232, 206, .78); }
+.ws-hero__cta {
+  position: relative; display: inline-flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 22px 0 26px; border: 0; border-radius: 999px;
+  background: var(--ws-bone); color: var(--ws-plum); font: 600 14px/1 var(--ws-font-ui); letter-spacing: .01em;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .4) inset, 0 14px 40px rgba(231, 107, 74, .22);
+  transition: transform .25s var(--ws-ease-out), box-shadow .3s, background .3s;
+}
+.ws-hero__cta:hover { transform: translateY(-2px); background: #fff4e0; box-shadow: 0 0 0 1px rgba(255, 255, 255, .5) inset, 0 18px 52px rgba(231, 107, 74, .4); }
+.ws-hero__cta:active { transform: translateY(0); }
+.ws-hero__cta svg { transition: transform .3s var(--ws-ease-out); }
+.ws-hero__cta:hover svg { transform: translateY(3px); }
+
+/* pause every ambient loop while the hero is off-screen or the tab is hidden */
+.ws-hero__stage.is-paused *, .ws-hero__stage.is-paused *::before, .ws-hero__stage.is-paused *::after { animation-play-state: paused !important; }
+
+@keyframes ws-planet-in { from { opacity: 0; transform: scale(.9) translate3d(0, 3vh, 0); } }
+@keyframes ws-rise { to { transform: translate3d(0, 0, 0); } }
+@keyframes ws-fade { from { opacity: 0; } }
+@keyframes ws-flow { to { stroke-dashoffset: -100; } }
+@keyframes ws-pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+.ws-particles__drift { animation: ws-drift 46s ease-in-out infinite alternate; }
+.ws-hero__particles { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; pointer-events: none; }
+.ws-star--bone { fill: var(--ws-bone); } .ws-star--lilac { fill: var(--ws-lilac); } .ws-star--lichen { fill: var(--ws-lichen); }
+.ws-star--twinkle { animation: ws-twinkle 7s ease-in-out infinite; }
+@keyframes ws-drift { to { transform: translate3d(0, -16px, 0); } }
+@keyframes ws-twinkle { 0%, 100% { opacity: .15; } 50% { opacity: .85; } }
+
+/* ── narrow screens: stacked copy ── */
+@media (max-width: 760px) {
+  .ws-hero__top { font-size: 10px; }
+  .ws-hero__place { display: none; }
+  .ws-hero__skip { margin-left: auto; }
+  .ws-hero__row { grid-template-columns: minmax(0, 1fr); gap: 14px; align-items: start; }
+  .ws-hero__headline { max-width: 20ch; }
+  .ws-hero__support { font-size: .88rem; }
+}
+@media (max-height: 560px) and (orientation: landscape) { .ws-hero__support { display: none; } .ws-hero__wordmark { font-size: clamp(2.4rem, 9vw, 7rem); } }
+
+/* ── reduced motion: a still, fully composed scene; scroll-linked fades remain (they follow the user's own input) ── */
+@media (prefers-reduced-motion: reduce) {
+  .ws-hero *, .ws-hero *::before, .ws-hero *::after { animation: none !important; transition: none !important; }
+  .ws-hero__letter { transform: none; }
+  .ws-hero__move { transform: none; will-change: auto; }
+  .ws-hero__copy { transform: none; }
+  .ws-hero__canvas { cursor: default; }
+}
+
+/* ── the entrance: starts only when the Enter button is activated (.is-entering), runs ~2.4 s on its own clock ──
+   0.0s  copy and header lift away          0.0s–1.9s  Earth recedes toward the workspace and fades
+   0.2s  an atmospheric ring expands        0.9s–2.1s  the whole scene dissolves, revealing the dashboard layers
+   The dashboard blocks emerge on their own staggered timeline (see styles/shell.css, [data-phase='transitioning']). */
+.ws-hero.is-entering { pointer-events: none; }
+.ws-hero.is-entering .ws-hero__stage { animation: ws-stage-out 1.2s var(--ws-ease-inout) .9s forwards; }
+.ws-hero.is-entering .ws-hero__copy { animation: ws-copy-out .85s var(--ws-ease-out) forwards; }
+.ws-hero.is-entering .ws-hero__top { animation: ws-copy-out .7s var(--ws-ease-out) forwards; }
+.ws-hero.is-entering .ws-hero__planetbox { animation: ws-planet-out 1.9s var(--ws-ease-inout) forwards; }
+.ws-hero.is-entering .ws-hero__orbits, .ws-hero.is-entering .ws-hero__filaments { animation: ws-fade-out .9s ease forwards; }
+.ws-hero__flare { position: absolute; z-index: 2; left: 50%; top: var(--ws-py); width: calc(var(--ws-pr) * 2); aspect-ratio: 1; margin: 0; border-radius: 50%; border: 1px solid rgba(216, 182, 213, .6); box-shadow: 0 0 60px rgba(216, 182, 213, .25), inset 0 0 60px rgba(216, 182, 213, .12); transform: translate(-50%, -50%) scale(1); opacity: 0; pointer-events: none; }
+.ws-hero.is-entering .ws-hero__flare { animation: ws-flare 1.5s .15s var(--ws-ease-out) forwards; }
+.ws-hero__cta:disabled { cursor: default; }
+@keyframes ws-copy-out { to { opacity: 0; transform: translate3d(0, -3.5vh, 0); } }
+@keyframes ws-fade-out { to { opacity: 0; } }
+@keyframes ws-planet-out { to { opacity: 0; transform: translate(-50%, -50%) translate3d(14vw, -10vh, 0) scale(.3); } }
+@keyframes ws-stage-out { to { opacity: 0; } }
+@keyframes ws-flare { 0% { opacity: 0; transform: translate(-50%, -50%) scale(1); } 20% { opacity: .85; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(2.8); } }
+@media (prefers-reduced-motion: reduce) { .ws-hero.is-entering .ws-hero__stage { animation: none; opacity: 0; } }
