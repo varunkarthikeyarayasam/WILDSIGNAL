@@ -39,6 +39,124 @@ class SourceError(RuntimeError):
         self.source, self.status = source, status
 
 
+# A real OSM snapshot is bundled with the backend so production does not
+# depend on a public Overpass server being reachable during normal refreshes.
+OSM_SNAPSHOT_PATH = Path(__file__).resolve().parents[1] / "osm_facilities.json"
+OSM_SNAPSHOT_BBOX = REGION_BBOX
+
+
+def _is_relevant_osm_feature(tags: dict[str, Any]) -> bool:
+    return (
+        tags.get("landuse") in {"industrial", "quarry"}
+        or "industrial" in tags
+        or tags.get("man_made") in {"works", "storage_tank", "kiln"}
+        or tags.get("power") in {"plant", "substation"}
+    )
+
+
+def seed_bundled_osm_snapshot() -> list[dict[str, Any]]:
+    """Seed real, bundled OSM context once when the database has no facilities."""
+    existing = cached_facilities()
+    if existing:
+        return existing
+
+    if not OSM_SNAPSHOT_PATH.is_file():
+        raise SourceError(
+            "osm_snapshot_missing",
+            "The bundled OpenStreetMap snapshot is missing from the backend deployment.",
+            503,
+        )
+
+    try:
+        raw_records = json.loads(OSM_SNAPSHOT_PATH.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        raise SourceError(
+            "osm_snapshot_invalid",
+            "The bundled OpenStreetMap snapshot could not be read.",
+            503,
+        ) from None
+
+    if not isinstance(raw_records, list):
+        raise SourceError(
+            "osm_snapshot_invalid",
+            "The bundled OpenStreetMap snapshot has an invalid format.",
+            503,
+        )
+
+    west, south, east, north = OSM_SNAPSHOT_BBOX
+    prepared: dict[str, dict[str, Any]] = {}
+    for item in raw_records:
+        if not isinstance(item, dict):
+            continue
+        tags = item.get("tags")
+        if not isinstance(tags, dict) or not _is_relevant_osm_feature(tags):
+            continue
+
+        lat = parse_number(item.get("latitude"))
+        lon = parse_number(item.get("longitude"))
+        if (
+            lat is None or lon is None
+            or not south <= lat <= north
+            or not west <= lon <= east
+        ):
+            continue
+
+        osm_type = item.get("osm_type")
+        osm_id = item.get("osm_id")
+        geometry = item.get("geometry")
+        record_id = item.get("id")
+        if (
+            osm_type not in {"node", "way", "relation"}
+            or not isinstance(osm_id, int) or isinstance(osm_id, bool) or osm_id <= 0
+            or not isinstance(record_id, str) or record_id != f"{osm_type}/{osm_id}"
+            or not isinstance(geometry, dict)
+            or geometry.get("type") not in {"Point", "LineString", "Polygon"}
+        ):
+            continue
+
+        prepared[record_id] = {
+            "id": record_id,
+            "osm_type": osm_type,
+            "osm_id": osm_id,
+            "name": item.get("name"),
+            "tags": tags,
+            "geometry": geometry,
+            "latitude": lat,
+            "longitude": lon,
+            "retrieved_at": item.get("retrieved_at") or "2026-10-20T11:10:07+00:00",
+        }
+
+    records = list(prepared.values())
+    if not records:
+        raise SourceError(
+            "osm_snapshot_empty",
+            "The bundled OpenStreetMap snapshot contains no valid facilities for this study area.",
+            503,
+        )
+
+    upsert_facilities(records)
+    snapshot_time = max(item["retrieved_at"] for item in records)
+    set_source_state(
+        "osm",
+        "available",
+        (
+            "Using the bundled OpenStreetMap snapshot captured "
+            f"{snapshot_time[:10]}. Facilities are real mapped features; "
+            "live Overpass requests are disabled in production refreshes."
+        ),
+        snapshot_time,
+        len(records),
+        time.time() + OSM_CACHE_SECONDS,
+        outcome="bundled_snapshot",
+    )
+    print(
+        f"WILDSIGNAL loaded {len(records)} facilities from bundled OSM snapshot "
+        f"({snapshot_time}).",
+        flush=True,
+    )
+    return records
+
+
 def _request(
     url: str,
     body: bytes | None = None,
