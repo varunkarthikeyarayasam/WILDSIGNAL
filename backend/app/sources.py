@@ -355,7 +355,7 @@ def fetch_osm(force: bool = False) -> list[dict[str, Any]]:
     failures = 0
 
     for tile_s, tile_w, tile_n, tile_e in tiles:
-        query = f"""[out:json][timeout:20];
+        query = f"""[out:json][timeout:30];
         (
           nwr["landuse"="industrial"]({tile_s},{tile_w},{tile_n},{tile_e});
           nwr["industrial"]({tile_s},{tile_w},{tile_n},{tile_e});
@@ -370,7 +370,7 @@ def fetch_osm(force: bool = False) -> list[dict[str, Any]]:
                 OVERPASS_URL,
                 urlencode({"data": query}).encode(),
                 "application/x-www-form-urlencoded",
-                max(5, min(OVERPASS_TIMEOUT_SECONDS, 25)),
+                max(5, min(OVERPASS_TIMEOUT_SECONDS, 40)),
             )
             payload = json.loads(raw)
 
