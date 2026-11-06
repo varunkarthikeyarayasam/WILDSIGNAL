@@ -13,7 +13,7 @@
 
 - Node.js 20.19+ (or 22.12+) and npm.
 - Python 3.10+ (tested here with Python 3.14) and pip.
-- Internet access for OpenStreetMap and Esri basemap tiles, optional NASA FIRMS, and OpenStreetMap Overpass refreshes.
+- Internet access for OpenStreetMap and Esri basemap tiles, and optional NASA FIRMS. OSM facility context is seeded from the bundled regional snapshot; production refreshes do not call public Overpass servers.
 
 ## Configure the API and data sources
 
@@ -23,9 +23,9 @@ Copy `.env.example` to `.env` in the project root. Set `FIRMS_MAP_KEY` to a key 
 
 `FIRMS_AREA` defaults to `79.92,12.95,80.42,13.42` (west, south, east, north), the existing Manali–Ennore study extent. `FIRMS_LOOKBACK_DAYS` may be 1–5. An absent key produces `credential_required`; it does not make the API unhealthy. Get a key from [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/api/map_key/). A key is needed for actual satellite observations and cannot be supplied by the frontend.
 
-The public Overpass endpoint defaults to `https://overpass-api.de/api/interpreter`. Queries cover the configured study box, request mapped context, use bounded retries for transient errors, and cache successful results for 12 hours. When an endpoint fails, prior facilities remain stored and their last-success time is retained. Public Overpass capacity is shared and can be delayed or rate limited; use a managed or self-hosted endpoint before production-scale use. [Overpass API guidance](https://dev.overpass-api.de/overpass-doc/en/preface/commons.html)
+The backend includes `backend/osm_facilities.json`, a real OpenStreetMap snapshot captured on 2026-10-20. On startup, if the facilities table is empty, the backend seeds it with valid features matching the project's industrial-context tags and study bounding box. In this project archive, that yields 1,351 mapped features. The original snapshot is retained as the source artifact; unrelated commercial/land-use features and out-of-bounds features are excluded during seeding. Normal production refreshes do not call public Overpass servers, so an Overpass outage cannot block FIRMS refreshes or remove the facility context. The bundled snapshot is static and must be deliberately refreshed/replaced to keep it current. OpenStreetMap data is available under the ODbL; preserve attribution and comply with its terms. [OpenStreetMap copyright and attribution](https://www.openstreetmap.org/copyright).
 
-Backend environment variables: `FIRMS_MAP_KEY`, `FIRMS_SOURCE`, `FIRMS_AREA`, `FIRMS_LOOKBACK_DAYS`, `OVERPASS_URL`, `OVERPASS_TIMEOUT_SECONDS`, `DATABASE_PATH`, and `CORS_ORIGINS`. `DATABASE_PATH` defaults to `%LOCALAPPDATA%/WILDSIGNAL/wildsignal.sqlite3` on Windows or `~/.local/WILDSIGNAL/wildsignal.sqlite3` elsewhere; the project retains `WILDSIGNAL_DB_PATH` as a compatibility fallback. `CORS_ORIGINS` is a comma-separated list and defaults to the two local Vite origins. Frontend configuration uses `VITE_API_BASE_URL` and defaults to `http://localhost:8000`.
+Backend environment variables: `FIRMS_MAP_KEY`, `FIRMS_SOURCE`, `FIRMS_AREA`, `FIRMS_LOOKBACK_DAYS`, `DATABASE_PATH`, and `CORS_ORIGINS`. Legacy `OVERPASS_URL` and `OVERPASS_TIMEOUT_SECONDS` settings are no longer used by the production refresh path. `DATABASE_PATH` defaults to `%LOCALAPPDATA%/WILDSIGNAL/wildsignal.sqlite3` on Windows or `~/.local/WILDSIGNAL/wildsignal.sqlite3` elsewhere; the project retains `WILDSIGNAL_DB_PATH` as a compatibility fallback. `CORS_ORIGINS` is a comma-separated list and defaults to the two local Vite origins. Frontend configuration uses `VITE_API_BASE_URL` and defaults to `http://localhost:8000`.
 
 ## Run the backend
 
@@ -71,15 +71,15 @@ python -m unittest discover -s backend/tests -t backend -v
 - `GET /api/observations/{id}` — selected observation and contextual analysis.
 - `GET /api/facilities` — cached OSM features and GeoJSON geometries in the study box.
 - `GET /api/history?days=90` — daily counts based on stored acquisitions.
-- `POST /api/refresh` — retrieve FIRMS and OSM data, respecting source caches; `?force=true` requests an explicit cache bypass.
+- `POST /api/refresh` — retrieve NASA FIRMS data, respecting its source cache; OSM context is served from the bundled snapshot and is not fetched during refresh. `?force=true` bypasses the FIRMS cache.
 
 `GET /api/status` gives each provider its own `status`, `configured`, `message`, `retrieved_at` (last successful fetch), `last_attempt_at`, `last_success_at`, `error_category`, and `cached_data_available` values. FIRMS can be `credential_required`, `available`, or `unavailable`; OSM errors leave its previously stored facilities available. A successful zero-record provider response is `available` with count zero, distinct from an error.
 
 ## Data and interpretation
 
-- The UI plots only records returned by the backend. No demo detections, facility features, statistics, or fallback dataset are bundled.
+- The UI plots only records returned by the backend. No demo detections or invented statistics are bundled. The backend includes a dated, genuine OSM facility-context snapshot; it is not live data and its capture date is reported in the OSM source status.
 - FIRMS records are stored with acquisition time, feed, satellite/instrument attributes, provider confidence and retrieval time. NASA confidence is never presented as WILDSIGNAL classification confidence.
-- OSM is geographic context, not validated industrial ground truth. Features can be missing or stale. Distances use a Haversine geodesic screening distance to the mapped feature’s representative coordinate (Overpass center for ways/relations); they are not distances to a verified facility boundary.
+- OSM is geographic context, not validated industrial ground truth. The bundled OSM snapshot was captured on 2026-10-20, so features can be missing or stale until the snapshot is deliberately updated. Distances use a Haversine geodesic screening distance to the mapped feature’s representative coordinate (Overpass center for ways/relations); they are not distances to a verified facility boundary.
 - `industrial_associated_candidate` means a detection falls within 500 m of a mapped feature tagged industrial/works/power. This is only a candidate association and is not proof of source. Vegetation/agriculture candidates are similarly based on nearby mapped land-use context. All other or inadequate context is `other_uncertain`. No numeric platform classification confidence is invented.
 - `recurring_across_observations` requires at least two UTC acquisition-date/satellite groups within 500 m in the locally stored history; same-day pixels from one satellite are grouped together. Otherwise the assessment is `insufficient_historical_evidence`; “newly observed” and “unusual change” are not asserted because this MVP does not yet establish complete observation coverage or a validated baseline. Recurrence does not imply continuous burning.
 - Empty successful data retrievals are distinct from missing credentials, provider errors, and an offline API. Cached SQLite records remain visible when a later provider request fails, and source status identifies the failure.
