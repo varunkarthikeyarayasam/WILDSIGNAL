@@ -38,7 +38,7 @@ from .schemas import (
     SourceState,
     StatusResponse,
 )
-from .sources import SourceError, fetch_firms, fetch_osm
+from .sources import SourceError, fetch_firms, seed_bundled_osm_snapshot
 
 
 app = FastAPI(
@@ -61,6 +61,24 @@ app.add_middleware(
 @app.on_event("startup")
 def startup() -> None:
     initialize()
+    try:
+        seed_bundled_osm_snapshot()
+    except SourceError as error:
+        # Keep the API healthy even if a deployment accidentally omits the
+        # snapshot; report the source problem through /api/status.
+        attempted_at = utc_now()
+        stored_count = _stored_count("osm")
+        set_source_state(
+            "osm",
+            "unavailable",
+            str(error),
+            attempted_at,
+            stored_count,
+            time.time() + OSM_CACHE_SECONDS,
+            error_category=error.source,
+            outcome="unavailable",
+        )
+        print(f"WILDSIGNAL OSM snapshot seed failed: {error.source}: {error}", flush=True)
 
 
 def _query(sql: str, params: tuple = ()) -> list[dict]:
@@ -457,43 +475,35 @@ def refresh(force: bool = False) -> RefreshResponse:
     results: dict[str, dict] = {}
     now = time.time()
 
-    for name, cache_seconds in (
-        ("firms", FIRMS_CACHE_SECONDS),
-        ("osm", OSM_CACHE_SECONDS),
+    # NASA FIRMS remains live. OSM facilities are loaded from the bundled
+    # regional snapshot at startup, avoiding unreliable public Overpass calls.
+    existing = source_states().get("firms", {})
+    if (
+        not force
+        and existing.get("status") in {"available", "unavailable", "credential_required"}
+        and existing.get("cache_until")
+        and existing["cache_until"] > now
     ):
-        existing = source_states().get(name, {})
-
-        if (
-            not force
-            and existing.get("status") in {"available", "unavailable"}
-            and existing.get("cache_until")
-            and existing["cache_until"] > now
-        ):
-            results[name] = {
-                "status": "cached",
-                "retrieved_at": existing.get("retrieved_at"),
-                "record_count": _stored_count(name),
-                "cached_data_available": _stored_count(name) > 0,
-            }
-            continue
-
+        stored_count = _stored_count("firms")
+        results["firms"] = {
+            "status": "cached",
+            "retrieved_at": existing.get("retrieved_at"),
+            "record_count": stored_count,
+            "cached_data_available": stored_count > 0,
+        }
+    else:
         try:
-            if name == "firms":
-                end = datetime.now(timezone.utc).date()
-                records = fetch_firms(
-                    end - timedelta(days=FIRMS_LOOKBACK_DAYS - 1),
-                    end,
-                )
-            else:
-                records = fetch_osm(force=True)
-
-            results[name] = {
+            end = datetime.now(timezone.utc).date()
+            records = fetch_firms(
+                end - timedelta(days=FIRMS_LOOKBACK_DAYS - 1),
+                end,
+            )
+            results["firms"] = {
                 "status": "available",
                 "retrieved_at": utc_now(),
                 "record_count": len(records),
-                "cached_data_available": _stored_count(name) > 0,
+                "cached_data_available": _stored_count("firms") > 0,
             }
-
         except SourceError as error:
             state = (
                 "credential_required"
@@ -501,53 +511,59 @@ def refresh(force: bool = False) -> RefreshResponse:
                 else "unavailable"
             )
             attempted_at = utc_now()
-            stored_count = _stored_count(name)
-
+            stored_count = _stored_count("firms")
             set_source_state(
-                name,
+                "firms",
                 state,
                 str(error),
                 attempted_at,
                 stored_count,
-                time.time() + cache_seconds,
+                time.time() + FIRMS_CACHE_SECONDS,
                 error_category=error.source,
                 outcome=state,
             )
-
-            results[name] = {
+            results["firms"] = {
                 "status": state,
                 "message": str(error),
                 "record_count": stored_count,
                 "cached_data_available": stored_count > 0,
                 "error_category": error.source,
             }
-
         except Exception:
             attempted_at = utc_now()
-            stored_count = _stored_count(name)
+            stored_count = _stored_count("firms")
             message = (
-                "Unexpected provider integration error; "
-                "previously stored data was retained."
+                "Unexpected NASA FIRMS integration error; "
+                "previously stored observations were retained."
             )
-
             set_source_state(
-                name,
+                "firms",
                 "unavailable",
                 message,
                 attempted_at,
                 stored_count,
-                time.time() + cache_seconds,
+                time.time() + FIRMS_CACHE_SECONDS,
                 error_category="provider_integration_error",
                 outcome="unavailable",
             )
-
-            results[name] = {
+            results["firms"] = {
                 "status": "unavailable",
                 "message": message,
                 "record_count": stored_count,
                 "cached_data_available": stored_count > 0,
                 "error_category": "provider_integration_error",
             }
+
+    osm_state = source_states().get("osm", {})
+    osm_count = _stored_count("osm")
+    results["osm"] = {
+        "status": osm_state.get("status", "unavailable"),
+        "message": osm_state.get("message") or "Using bundled OpenStreetMap context; no live Overpass request is made during refresh.",
+        "retrieved_at": osm_state.get("retrieved_at"),
+        "record_count": osm_count,
+        "cached_data_available": osm_count > 0,
+        "outcome": osm_state.get("outcome", "bundled_snapshot"),
+    }
 
     return RefreshResponse(
         completed_at=utc_now(),
